@@ -83,7 +83,7 @@ jobs:
         run: |
           wget -c "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
           chmod 0755 appimagetool-x86_64.AppImage
-          ./appimagetool-x86_64.AppImage appdir
+          ./appimagetool-x86_64.AppImage appdir --comp xz
           mv LabelPlusFX*.AppImage LabelPlusFX-2.3.3-x86_64.AppImage
       - name: auto release
         uses: "marvinpinto/action-automatic-releases@latest"
