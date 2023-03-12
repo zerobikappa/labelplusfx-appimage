@@ -1,0 +1,97 @@
+name: linux - labelplusfx-appimage
+  #on: [push]
+on: [workflow_dispatch]
+jobs:
+  labelplusfx-appimage:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:18.04
+      options: --privileged
+    steps:
+      - name: Install packages
+        run: |
+          apt-get update -y
+          apt-get install -y \
+                    sudo \
+                    wget \
+                    patch \
+                    maven \
+                    openjdk-17-jdk \
+                    dos2unix \
+                    fuse \
+                    libfuse2 \
+                    file \
+                    gsettings-desktop-schemas \
+                    fonts-arphic-uming
+          wget https://dlcdn.apache.org/maven/maven-3/3.8.7/binaries/apache-maven-3.8.7-bin.tar.gz
+          tar zxvf apache-maven-3.8.7-bin.tar.gz
+          cd /usr/share/maven
+          sudo rm -rf /usr/share/maven/*
+          sudo cp -r $GITHUB_WORKSPACE/apache-maven-3.8.7/* .
+          cd $GITHUB_WORKSPACE
+      - name: download patch
+        uses: actions/checkout@v3
+        with:
+          repository: zerobikappa/labelplusfx-appimage
+          path: labelplusfx-appimage
+      - name: prepare source
+        run: |
+          wget -c "https://github.com/Meodinger/LabelPlusFX/archive/refs/tags/v2.3.3.tar.gz"
+          tar zxvf v2.3.3.tar.gz
+          cd LabelPlusFX-2.3.3
+          dos2unix 'src/main/kotlin/ink/meodinger/lpfx/component/properties/DialogSettings.kt'
+          cp -fv "$GITHUB_WORKSPACE/labelplusfx-appimage/labelplusfx-2.3.3.patch" "$GITHUB_WORKSPACE/labelplusfx-2.3.3.patch"
+          patch --verbose -p1 -i "$GITHUB_WORKSPACE/labelplusfx-2.3.3.patch"
+          cat pom.xml
+          cd $GITHUB_WORKSPACE
+      - name: build labelplusfx
+        run: |
+          cd "$GITHUB_WORKSPACE/LabelPlusFX-2.3.3"
+          mvn package
+          cd $GITHUB_WORKSPACE
+      - name: make appdir
+        run: |
+          apt autoremove -y \
+                  maven \
+                  openjdk-17-jdk
+          apt-get install -y \
+                  openjdk-17-jre 
+          mkdir -p appdir/usr/bin
+          mkdir -p appdir/usr/lib/jvm
+          mkdir -p appdir/usr/share/applications
+          mkdir -p appdir/usr/share/pixmaps
+          mkdir -p appdir/usr/share/labelplusfx/runtime
+          cp -rLv /usr/lib/jvm/java-17-openjdk* appdir/usr/lib/jvm
+          rm -rfv appdir/usr/lib/jvm/java-17-openjdk*/{docs,legal,man}
+          cp -v labelplusfx-appimage/AppRun appdir/
+          chmod -v 0755 appdir/AppRun
+          cp -rv LabelPlusFX-2.3.3/target/build/* appdir/usr/share/labelplusfx/runtime
+          cp -v labelplusfx-appimage/labelplusfx appdir/usr/share/labelplusfx/
+          chmod -v 0755 appdir/usr/share/labelplusfx/labelplusfx
+          cp -v LabelPlusFX-2.3.3/images/logo.png appdir/usr/share/pixmaps/labelplusfx.png
+          cp -v LabelPlusFX-2.3.3/images/logo.png appdir/labelplusfx.png
+          cp -v labelplusfx-appimage/labelplusfx.desktop appdir/usr/share/applications/labelplusfx.desktop
+          cp -v labelplusfx-appimage/labelplusfx.desktop appdir/labelplusfx.desktop
+          mkdir -p appdir/usr/share/GConf/gsettings/
+          mkdir -p appdir/usr/share/glib-2.0/schemas/
+          cp -rv /usr/share/GConf/gsettings/* appdir/usr/share/GConf/gsettings/ 
+          cp -rv /usr/share/glib-2.0/schemas/* appdir/usr/share/glib-2.0/schemas/
+          mkdir -p appdir/usr/share/fonts/
+          cp /usr/share/fonts/truetype/arphic/uming.ttc appdir/usr/share/fonts/uming.ttc
+          cd $GTIHUB_WORKSPACE
+      - name: package appimage
+        run: |
+          wget -c "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod 0755 appimagetool-x86_64.AppImage
+          ./appimagetool-x86_64.AppImage appdir
+          mv labelplusfx*.AppImage labelplusfx-2.3.3-x86_64.AppImage
+      - name: auto release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "labelplusfx-appimage-2.3.3"
+          title: "LabelPlusFX-AppImage 2.3.3"
+          prerelease: false
+          files: |
+            labelplusfx*.AppImage
+      - run: echo "🍏 This job's status is ${{ job.status }}."

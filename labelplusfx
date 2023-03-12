@@ -1,0 +1,8 @@
+#!/bin/sh
+SELF=$(readlink -f "$0")
+HERE=${SELF%/*}
+
+#/usr/share/labelplusfx
+
+"${HERE}/../../lib/jvm/java-17-openjdk-amd64/bin/java" -jar "${HERE}/runtime/lpfx-2.3.3.jar" --disable-jni --no-check-update "$@"
+
